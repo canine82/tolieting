@@ -213,6 +213,3 @@ For issues or questions:
 3. Check browser console for error messages
 4. Review `backend` terminal output for API errors
 
-## License
-
-This project is proprietary software for elder care centers.
