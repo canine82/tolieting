@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  eldercare:
+    build: .
+    ports:
+      - "80:80"
+    environment:
+      - PORT=5000
+    volumes:
+      - ./backend/data:/app/backend/data  # Persist SQLite data
+    restart: unless-stopped
