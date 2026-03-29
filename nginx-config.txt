@@ -1,0 +1,60 @@
+# Elder Care Toileting System - Nginx Configuration with Fallback
+# Save as: /etc/nginx/sites-available/eldercare
+# Enable with: sudo ln -s /etc/nginx/sites-available/eldercare /etc/nginx/sites-enabled/
+
+upstream eldercare_backend {
+    server localhost:5000;
+    keepalive 64;
+}
+
+server {
+    listen 80;
+    server_name YOUR_DOMAIN_HERE;  # Change this to your domain or IP
+
+    # Log files
+    access_log /var/log/nginx/eldercare_access.log;
+    error_log /var/log/nginx/eldercare_error.log;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css text/javascript application/json;
+
+    # Serve maintenance page when backend is down
+    error_page 502 503 504 /maintenance.html;
+
+    location = /maintenance.html {
+        root /home/your_user/tolieting;
+        internal;
+    }
+
+    # API endpoints
+    location /api/ {
+        proxy_pass http://eldercare_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Frontend static files
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        root /home/your_user/tolieting/frontend/dist;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Main app (SPA fallback to index.html)
+    location / {
+        root /home/your_user/tolieting/frontend/dist;
+        try_files $uri /index.html;
+    }
+}
