@@ -4,7 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
-RUN npm run build
+RUN npx vite build
 
 # Stage 2: Backend and nginx
 FROM node:18-alpine
