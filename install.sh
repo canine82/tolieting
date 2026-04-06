@@ -64,14 +64,14 @@ cd backend
 npm install
 cd ../frontend
 npm install
-npm run build
+npx vite build
 cd ..
 
 # Step 6: Create Nginx Config
 echo -e "${BLUE}[6/8] Setting up Nginx...${NC}"
 sudo tee /etc/nginx/sites-available/eldercare > /dev/null <<EOF
 server {
-    listen 80;
+    listen 3000;
     server_name $VPS_DOMAIN;
 
     location / {
@@ -113,7 +113,7 @@ echo "✓ Installation Complete!"
 echo "==========================================${NC}"
 echo ""
 echo -e "${GREEN}Your app is running at:${NC}"
-echo -e "  http://$VPS_DOMAIN"
+echo -e "  http://$VPS_DOMAIN:3000"
 echo ""
 echo -e "${GREEN}Useful Commands:${NC}"
 echo "  pm2 status              - Check app status"
