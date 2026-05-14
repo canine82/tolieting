@@ -1,14 +1,22 @@
 # Stage 1: Build frontend
-FROM node:18-alpine as frontend-build
+FROM node:18-alpine AS frontend-build
+
 WORKDIR /app/frontend
+
+# Install dependencies
 COPY frontend/package*.json ./
 RUN npm ci
+
+# Copy source and build
 COPY frontend/ .
 RUN npx vite build
 
-# Stage 2: Backend and nginx
+# Stage 2: Backend + nginx
 FROM node:18-alpine
+
+# Install runtime dependencies
 RUN apk add --no-cache nginx python3 py3-pip make g++
+
 WORKDIR /app
 
 # Copy nginx config
@@ -17,14 +25,15 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 # Copy built frontend
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Copy backend
+# Backend setup
 COPY backend/package*.json ./backend/
 RUN cd backend && npm ci --only=production
 COPY backend/ ./backend/
-# Rebuild native modules for the target platform
+
+# Rebuild native modules for Alpine (sqlite3, etc.)
 RUN cd backend && npm rebuild sqlite3 --build-from-source
 
-# Expose port
+# Expose HTTP port
 EXPOSE 80
 
 # Copy start script
