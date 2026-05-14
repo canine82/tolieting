@@ -29,6 +29,9 @@ export const initializeDatabase = () => {
         )
       `, (err) => {
         if (err) reject(err);
+        else {
+          db.run(`ALTER TABLE elders ADD COLUMN pp_alert_time TEXT`, () => {});
+        }
       });
 
       // Create staff table
@@ -84,17 +87,25 @@ export const initializeDatabase = () => {
           completed_by_staff TEXT,
           notes TEXT,
            bowel_movement INTEGER DEFAULT 0, -- 0 = no, 1 = yes
-          status TEXT DEFAULT 'pending',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (elder_id) REFERENCES elders(id)
+          status TEXT DEFAULT 'pending'
         )
       `, (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          console.log('Database schema initialized successfully');
-          resolve();
-        }
+        if (err) return reject(err);
+
+        // Create settings table
+        db.run(`
+          CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+          )
+        `, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            console.log('Database schema initialized successfully');
+            resolve();
+          }
+        });
       });
     });
   });

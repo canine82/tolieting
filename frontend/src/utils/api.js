@@ -6,21 +6,21 @@ export const fetchElders = async () => {
   return response.json();
 };
 
-export const addElder = async (name, identification_number, track_poo_pee = false) => {
+export const addElder = async (name, identification_number, track_poo_pee = false, pp_alert_time = '') => {
   const response = await fetch(`${API_BASE}/elders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, identification_number, track_poo_pee })
+    body: JSON.stringify({ name, identification_number, track_poo_pee, pp_alert_time })
   });
   if (!response.ok) throw new Error('Failed to add elder');
   return response.json();
 };
 
-export const updateElder = async (id, name, identification_number, track_poo_pee = false) => {
+export const updateElder = async (id, name, identification_number, track_poo_pee = false, pp_alert_time = '') => {
   const response = await fetch(`${API_BASE}/elders/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, identification_number, track_poo_pee })
+    body: JSON.stringify({ name, identification_number, track_poo_pee, pp_alert_time })
   });
   if (!response.ok) throw new Error('Failed to update elder');
   return response.json();
@@ -75,6 +75,32 @@ export const updateToiletingStatus = async (elder_id, scheduled_time, status, co
     body: JSON.stringify(payload)
   });
   if (!response.ok) throw new Error('Failed to update status');
+  return response.json();
+};
+
+export const updateToiletingEvent = async (id, payload) => {
+  const response = await fetch(`${API_BASE}/toileting-events/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to update toileting event');
+  return response.json();
+};
+
+export const getSettings = async () => {
+  const response = await fetch(`${API_BASE}/settings`);
+  if (!response.ok) throw new Error('Failed to fetch settings');
+  return response.json();
+};
+
+export const saveSettings = async (settings) => {
+  const response = await fetch(`${API_BASE}/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  });
+  if (!response.ok) throw new Error('Failed to save settings');
   return response.json();
 };
 

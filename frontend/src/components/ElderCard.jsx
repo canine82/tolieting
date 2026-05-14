@@ -17,7 +17,9 @@ export default function ElderCard({ elder, currentTime, isOverdue, onMarkInProgr
   const currentTimeStr = formatTime(currentTime);
   const currentTimeMinutes = parseTime(currentTimeStr);
 
-  const isPooPeeMode = elder.track_poo_pee === 1;
+  const isPooPeeMode = elder.track_poo_pee > 0;
+  const trackPoo = elder.track_poo_pee === 1 || elder.track_poo_pee === 2;
+  const trackPee = elder.track_poo_pee === 1 || elder.track_poo_pee === 3;
 
   const getEffectiveNextTime = () => {
     const nextTimeMinutes = parseTime(elder.next_toileting_time);
@@ -28,7 +30,7 @@ export default function ElderCard({ elder, currentTime, isOverdue, onMarkInProgr
   };
 
   const getStatus = () => {
-    if (isPooPeeMode) return 'pending'; // Always active in poo/pee mode
+    if (isPooPeeMode) return 'pending'; // Always active in tracker mode
     if (elder.completed_count === elder.total_schedules) return 'completed';
     if (elder.in_progress_count > 0) return 'in-progress';
     const effectiveNextTime = getEffectiveNextTime();
@@ -93,20 +95,29 @@ export default function ElderCard({ elder, currentTime, isOverdue, onMarkInProgr
 
       {isPooPeeMode ? (
         <div className="elder-card-poo-pee" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Poo Count: {elder.poo_count || 0}</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn btn-secondary" onClick={() => onUpdatePooPee(elder.id, 'poo', -1)} disabled={!elder.poo_count}>-1</button>
-              <button className="btn btn-primary" onClick={() => onUpdatePooPee(elder.id, 'poo', 1)}>+1</button>
+          {trackPoo && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Poo Count: {elder.poo_count || 0}</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={() => onUpdatePooPee(elder.id, 'poo', -1)} disabled={!elder.poo_count}>-1</button>
+                <button className="btn btn-primary" onClick={() => onUpdatePooPee(elder.id, 'poo', 1)}>+1</button>
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Pee Count: {elder.pee_count || 0}</span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn btn-secondary" onClick={() => onUpdatePooPee(elder.id, 'pee', -1)} disabled={!elder.pee_count}>-1</button>
-              <button className="btn btn-primary" onClick={() => onUpdatePooPee(elder.id, 'pee', 1)}>+1</button>
+          )}
+          {trackPee && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Pee Count: {elder.pee_count || 0}</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={() => onUpdatePooPee(elder.id, 'pee', -1)} disabled={!elder.pee_count}>-1</button>
+                <button className="btn btn-primary" onClick={() => onUpdatePooPee(elder.id, 'pee', 1)}>+1</button>
+              </div>
             </div>
-          </div>
+          )}
+          {elder.pp_alert_time && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#555', textAlign: 'center', backgroundColor: '#f0f4f8', padding: '0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+              ⏰ Alert to be sent at <strong>{elder.pp_alert_time}</strong> hrs
+            </div>
+          )}
         </div>
       ) : (
         <>

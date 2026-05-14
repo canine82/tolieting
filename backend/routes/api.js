@@ -1,5 +1,6 @@
 import express from 'express';
 import { runQuery, runSingleQuery, runWrite } from '../database.js';
+import { sendTelegramAlert } from '../telegram.js';
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ router.get('/daily-roster', async (req, res) => {
 
     const roster = await runQuery(`
       SELECT 
-        e.id, e.name, e.identification_number, e.track_poo_pee,
+        e.id, e.name, e.identification_number, e.track_poo_pee, e.pp_alert_time,
         dr.is_present, dr.poo_count, dr.pee_count,
         (SELECT MIN(time_of_day) FROM toileting_schedule WHERE elder_id = e.id AND NOT EXISTS (SELECT 1 FROM toileting_events WHERE elder_id = toileting_schedule.elder_id AND scheduled_time = toileting_schedule.time_of_day AND date = ? AND status IN ('completed', 'in_progress'))) as next_toileting_time,
         (SELECT scheduled_time FROM toileting_events WHERE elder_id = e.id AND date = ? AND status = 'in_progress' LIMIT 1) as in_progress_time,
@@ -162,6 +163,14 @@ router.post('/update-poo-pee-count', async (req, res) => {
       [newCount, elder_id, today]
     );
 
+    // Fetch elder details to send Telegram alert
+    const elder = await runSingleQuery('SELECT name FROM elders WHERE id = ?', [elder_id]);
+    if (elder) {
+      const typeStr = type === 'poo' ? '💩 Poo' : '💧 Pee';
+      const changeStr = amount > 0 ? 'increased' : 'decreased';
+      await sendTelegramAlert(`Elder <b>${elder.name}</b>'s ${typeStr} count was ${changeStr} to <b>${newCount}</b>.`);
+    }
+
     res.json({ success: true, message: `${type} count updated`, newCount });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -261,10 +270,10 @@ router.get('/elders', async (req, res) => {
 // Add new elder
 router.post('/elders', async (req, res) => {
   try {
-    const { name, identification_number, track_poo_pee } = req.body;
+    const { name, identification_number, track_poo_pee, pp_alert_time } = req.body;
     const result = await runWrite(
-      'INSERT INTO elders (name, identification_number, track_poo_pee) VALUES (?, ?, ?)',
-      [name, identification_number, track_poo_pee ? 1 : 0]
+      'INSERT INTO elders (name, identification_number, track_poo_pee, pp_alert_time) VALUES (?, ?, ?, ?)',
+      [name, identification_number, track_poo_pee ? 1 : 0, pp_alert_time || null]
     );
     res.json({ success: true, id: result.id, message: 'Elder added' });
   } catch (error) {
@@ -276,7 +285,7 @@ router.post('/elders', async (req, res) => {
 router.put('/elders/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, identification_number, track_poo_pee } = req.body;
+    const { name, identification_number, track_poo_pee, pp_alert_time } = req.body;
 
     const existing = await runSingleQuery('SELECT * FROM elders WHERE id = ?', [id]);
     if (!existing) {
@@ -284,11 +293,12 @@ router.put('/elders/:id', async (req, res) => {
     }
 
     await runWrite(
-      'UPDATE elders SET name = ?, identification_number = ?, track_poo_pee = ? WHERE id = ?',
+      'UPDATE elders SET name = ?, identification_number = ?, track_poo_pee = ?, pp_alert_time = ? WHERE id = ?',
       [
         name || existing.name, 
         identification_number || existing.identification_number, 
         track_poo_pee !== undefined ? (track_poo_pee ? 1 : 0) : existing.track_poo_pee, 
+        pp_alert_time !== undefined ? pp_alert_time : existing.pp_alert_time,
         id
       ]
     );
@@ -379,6 +389,37 @@ router.delete('/toileting-schedule/:id', async (req, res) => {
 
     await runWrite('DELETE FROM toileting_schedule WHERE id = ?', [id]);
     res.json({ success: true, message: 'Schedule deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Settings Endpoints
+router.get('/settings', async (req, res) => {
+  try {
+    const rows = await runQuery('SELECT key, value FROM settings');
+    const settings = rows.reduce((acc, row) => {
+      acc[row.key] = row.value;
+      return acc;
+    }, {});
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/settings', async (req, res) => {
+  try {
+    const settings = req.body;
+    for (const [key, value] of Object.entries(settings)) {
+      const existing = await runSingleQuery('SELECT key FROM settings WHERE key = ?', [key]);
+      if (existing) {
+        await runWrite('UPDATE settings SET value = ? WHERE key = ?', [value, key]);
+      } else {
+        await runWrite('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);
+      }
+    }
+    res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchElders, setupDay, addElder, updateElder, deleteElder } from '../utils/api.js';
+import { fetchElders, setupDay, addElder, updateElder, deleteElder, getSettings, saveSettings } from '../utils/api.js';
 import ScheduleManager from './ScheduleManager';
 import '../styles/tablet.css';
 
@@ -8,7 +8,17 @@ export default function SetupScreen({ onDaySetup }) {
   const [selectedElders, setSelectedElders] = useState([]);
   const [newElderName, setNewElderName] = useState('');
   const [newElderId, setNewElderId] = useState('');
-  const [newElderTrackPooPee, setNewElderTrackPooPee] = useState(false);
+  const [newElderTrackPoo, setNewElderTrackPoo] = useState(false);
+  const [newElderTrackPee, setNewElderTrackPee] = useState(false);
+  const [newElderPpAlertTime, setNewElderPpAlertTime] = useState('');
+  
+  // Settings state
+  const [commsName, setCommsName] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramBotToken, setTelegramBotToken] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -17,19 +27,38 @@ export default function SetupScreen({ onDaySetup }) {
   const [editingElder, setEditingElder] = useState(null);
 
   useEffect(() => {
-    loadElders();
+    loadData();
   }, []);
 
-  const loadElders = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const data = await fetchElders();
-      setElders(data);
-      setSelectedElders([]);
+      const [eldersData, settingsData] = await Promise.all([fetchElders(), getSettings()]);
+      setElders(eldersData);
+      if (settingsData.COMMS_NAME) setCommsName(settingsData.COMMS_NAME);
+      if (settingsData.TELEGRAM_CHAT_ID) setTelegramChatId(settingsData.TELEGRAM_CHAT_ID);
+      if (settingsData.TELEGRAM_BOT_TOKEN) setTelegramBotToken(settingsData.TELEGRAM_BOT_TOKEN);
     } catch (err) {
-      setError('Failed to load elders: ' + err.message);
+      setError('Failed to load initial data: ' + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setSettingsSaving(true);
+      await saveSettings({
+        COMMS_NAME: commsName,
+        TELEGRAM_CHAT_ID: telegramChatId,
+        TELEGRAM_BOT_TOKEN: telegramBotToken
+      });
+      setSettingsMessage('Settings saved!');
+      setTimeout(() => setSettingsMessage(''), 3000);
+    } catch (err) {
+      setSettingsMessage('Failed to save settings');
+    } finally {
+      setSettingsSaving(false);
     }
   };
 
@@ -49,12 +78,19 @@ export default function SetupScreen({ onDaySetup }) {
 
     try {
       setSubmitting(true);
-      const result = await addElder(newElderName, newElderId, newElderTrackPooPee);
-      setElders([...elders, { id: result.id, name: newElderName, identification_number: newElderId, track_poo_pee: newElderTrackPooPee ? 1 : 0 }]);
+      let trackVal = 0;
+      if (newElderTrackPoo && newElderTrackPee) trackVal = 1;
+      else if (newElderTrackPoo) trackVal = 2;
+      else if (newElderTrackPee) trackVal = 3;
+
+      const result = await addElder(newElderName, newElderId, trackVal, newElderPpAlertTime);
+      setElders([...elders, { id: result.id, name: newElderName, identification_number: newElderId, track_poo_pee: trackVal, pp_alert_time: newElderPpAlertTime }]);
       setSelectedElders([...selectedElders, result.id]);
       setNewElderName('');
       setNewElderId('');
-      setNewElderTrackPooPee(false);
+      setNewElderTrackPoo(false);
+      setNewElderTrackPee(false);
+      setNewElderPpAlertTime('');
       setError('');
     } catch (err) {
       setError('Failed to add elder: ' + err.message);
@@ -67,7 +103,9 @@ export default function SetupScreen({ onDaySetup }) {
     setEditingElder(elder);
     setNewElderName(elder.name);
     setNewElderId(elder.identification_number);
-    setNewElderTrackPooPee(elder.track_poo_pee === 1);
+    setNewElderTrackPoo(elder.track_poo_pee === 1 || elder.track_poo_pee === 2);
+    setNewElderTrackPee(elder.track_poo_pee === 1 || elder.track_poo_pee === 3);
+    setNewElderPpAlertTime(elder.pp_alert_time || '');
   };
 
   const handleSaveEdit = async () => {
@@ -78,15 +116,22 @@ export default function SetupScreen({ onDaySetup }) {
 
     try {
       setSubmitting(true);
-      await updateElder(editingElder.id, newElderName, newElderId, newElderTrackPooPee);
+      let trackVal = 0;
+      if (newElderTrackPoo && newElderTrackPee) trackVal = 1;
+      else if (newElderTrackPoo) trackVal = 2;
+      else if (newElderTrackPee) trackVal = 3;
+
+      await updateElder(editingElder.id, newElderName, newElderId, trackVal, newElderPpAlertTime);
       setElders(elders.map(e => e.id === editingElder.id 
-        ? { ...e, name: newElderName, identification_number: newElderId, track_poo_pee: newElderTrackPooPee ? 1 : 0 } 
+        ? { ...e, name: newElderName, identification_number: newElderId, track_poo_pee: trackVal, pp_alert_time: newElderPpAlertTime } 
         : e
       ));
       setEditingElder(null);
       setNewElderName('');
       setNewElderId('');
-      setNewElderTrackPooPee(false);
+      setNewElderTrackPoo(false);
+      setNewElderTrackPee(false);
+      setNewElderPpAlertTime('');
       setError('');
     } catch (err) {
       setError('Failed to update elder: ' + err.message);
@@ -117,7 +162,9 @@ export default function SetupScreen({ onDaySetup }) {
     setEditingElder(null);
     setNewElderName('');
     setNewElderId('');
-    setNewElderTrackPooPee(false);
+    setNewElderTrackPoo(false);
+    setNewElderTrackPee(false);
+    setNewElderPpAlertTime('');
   };
 
   const handleManageSchedule = (elder) => {
@@ -169,6 +216,28 @@ export default function SetupScreen({ onDaySetup }) {
 
       <div className="content">
         <div className="setup-screen">
+          <div className="setup-section settings-section" style={{ backgroundColor: '#fff', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '2rem' }}>
+            <h2 style={{ borderBottom: '2px solid #edf2f7', paddingBottom: '0.5rem', marginBottom: '1rem', color: '#2b6cb0' }}>Communication Settings</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label>Comms Group Name:</label>
+                <input type="text" value={commsName} onChange={(e) => setCommsName(e.target.value)} placeholder="e.g. Ward A" className="add-elder-input" />
+              </div>
+              <div>
+                <label>Telegram Chat ID:</label>
+                <input type="text" value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} placeholder="e.g. -10012345678" className="add-elder-input" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label>Telegram Bot Token:</label>
+                <input type="text" value={telegramBotToken} onChange={(e) => setTelegramBotToken(e.target.value)} placeholder="e.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" className="add-elder-input" />
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={handleSaveSettings} disabled={settingsSaving} style={{ marginTop: '1rem' }}>
+              {settingsSaving ? 'Saving...' : '💾 Save Settings'}
+            </button>
+            {settingsMessage && <span style={{ marginLeft: '1rem', color: settingsMessage.includes('Failed') ? 'red' : 'green', fontWeight: 'bold' }}>{settingsMessage}</span>}
+          </div>
+
           <div className="setup-title">Select Present Elders</div>
           <p className="setup-subtitle">Choose which elders are present today</p>
 
@@ -244,14 +313,37 @@ export default function SetupScreen({ onDaySetup }) {
                 onChange={(e) => setNewElderId(e.target.value)}
                 className="add-elder-input"
               />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 1rem' }}>
-                <input
-                  type="checkbox"
-                  checked={newElderTrackPooPee}
-                  onChange={(e) => setNewElderTrackPooPee(e.target.checked)}
-                />
-                Track Poo/Pee instead of timing
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 1rem', padding: '0.5rem 0' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#555' }}>Tracker Options (Instead of timing):</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={newElderTrackPoo}
+                    onChange={(e) => setNewElderTrackPoo(e.target.checked)}
+                  />
+                  Track Poo
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={newElderTrackPee}
+                    onChange={(e) => setNewElderTrackPee(e.target.checked)}
+                  />
+                  Track Pee
+                </label>
+              </div>
+              {(newElderTrackPoo || newElderTrackPee) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 1rem', paddingBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.9rem', color: '#555' }}>Reminder Time (24h):</label>
+                  <input
+                    type="time"
+                    value={newElderPpAlertTime}
+                    onChange={(e) => setNewElderPpAlertTime(e.target.value)}
+                    className="add-elder-input"
+                    style={{ width: 'auto', marginBottom: 0, padding: '0.3rem' }}
+                  />
+                </div>
+              )}
               {editingElder ? (
                 <>
                   <button

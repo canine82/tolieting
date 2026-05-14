@@ -1,11 +1,8 @@
 # Use official Node.js image as base
-FROM node:18-alpine
+FROM node:18
 
 # Set working directory
 WORKDIR /app
-
-# Install curl for healthchecks
-RUN apk add --no-cache curl
 
 # Copy package files
 COPY backend/package*.json ./
