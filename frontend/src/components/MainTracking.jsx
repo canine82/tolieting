@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getDailyRoster, checkOverdue, updateToiletingStatus, addElderManual, fetchElders, getDailyLogs } from '../utils/api.js';
+import { getDailyRoster, checkOverdue, updateToiletingStatus, addElderManual, fetchElders, getDailyLogs, deleteElder, updatePooPeeCount } from '../utils/api.js';
 import { toggleAudio, isAudioEnabled, triggerAlert } from '../utils/alerts.js';
 import ElderCard from './ElderCard';
 import '../styles/tablet.css';
@@ -103,6 +103,15 @@ export default function MainTracking({ onExit }) {
     }
   };
 
+  const handleUpdatePooPee = async (elder_id, type, amount) => {
+    try {
+      await updatePooPeeCount(elder_id, type, amount);
+      await loadRoster();
+    } catch (err) {
+      setError(`Failed to update ${type} count`);
+    }
+  };
+
 
   const handleAddElderManual = async () => {
     const available = allElders.filter(e => !roster.some(r => r.id === e.id));
@@ -135,6 +144,19 @@ export default function MainTracking({ onExit }) {
       setShowLogs(true);
     } catch (err) {
       setError('Failed to load logs');
+    }
+  };
+
+  const handleDeleteElder = async (elder) => {
+    if (!window.confirm(`Delete elder "${elder.name}"? This will also delete their schedules and toileting records.`)) {
+      return;
+    }
+    try {
+      await deleteElder(elder.id);
+      await loadRoster();
+      await loadAllElders();
+    } catch (err) {
+      setError('Failed to delete elder');
     }
   };
 
@@ -281,6 +303,8 @@ export default function MainTracking({ onExit }) {
                     onMarkInProgress={handleMarkInProgress}
                     onMarkDone={handleMarkDone}
                     onMarkUndo={handleMarkUndo}
+                    onDelete={handleDeleteElder}
+                    onUpdatePooPee={handleUpdatePooPee}
                   />
                 ))
               )}

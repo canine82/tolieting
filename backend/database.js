@@ -24,6 +24,7 @@ export const initializeDatabase = () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           identification_number TEXT UNIQUE NOT NULL,
+          track_poo_pee INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
@@ -62,6 +63,8 @@ export const initializeDatabase = () => {
           date TEXT NOT NULL,
           elder_id INTEGER NOT NULL,
           is_present INTEGER DEFAULT 1,
+          poo_count INTEGER DEFAULT 0,
+          pee_count INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (elder_id) REFERENCES elders(id),
           UNIQUE(date, elder_id)
@@ -80,6 +83,7 @@ export const initializeDatabase = () => {
           actual_time TEXT,
           completed_by_staff TEXT,
           notes TEXT,
+           bowel_movement INTEGER DEFAULT 0, -- 0 = no, 1 = yes
           status TEXT DEFAULT 'pending',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (elder_id) REFERENCES elders(id)

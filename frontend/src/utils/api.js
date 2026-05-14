@@ -6,13 +6,41 @@ export const fetchElders = async () => {
   return response.json();
 };
 
-export const addElder = async (name, identification_number) => {
+export const addElder = async (name, identification_number, track_poo_pee = false) => {
   const response = await fetch(`${API_BASE}/elders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, identification_number })
+    body: JSON.stringify({ name, identification_number, track_poo_pee })
   });
   if (!response.ok) throw new Error('Failed to add elder');
+  return response.json();
+};
+
+export const updateElder = async (id, name, identification_number, track_poo_pee = false) => {
+  const response = await fetch(`${API_BASE}/elders/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, identification_number, track_poo_pee })
+  });
+  if (!response.ok) throw new Error('Failed to update elder');
+  return response.json();
+};
+
+export const deleteElder = async (id) => {
+  const response = await fetch(`${API_BASE}/elders/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Failed to delete elder');
+  return response.json();
+};
+
+export const updatePooPeeCount = async (elder_id, type, amount) => {
+  const response = await fetch(`${API_BASE}/update-poo-pee-count`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ elder_id, type, amount })
+  });
+  if (!response.ok) throw new Error('Failed to update count');
   return response.json();
 };
 

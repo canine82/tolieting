@@ -59,8 +59,8 @@ router.get('/daily-roster', async (req, res) => {
 
     const roster = await runQuery(`
       SELECT 
-        e.id, e.name, e.identification_number,
-        dr.is_present,
+        e.id, e.name, e.identification_number, e.track_poo_pee,
+        dr.is_present, dr.poo_count, dr.pee_count,
         (SELECT MIN(time_of_day) FROM toileting_schedule WHERE elder_id = e.id AND NOT EXISTS (SELECT 1 FROM toileting_events WHERE elder_id = toileting_schedule.elder_id AND scheduled_time = toileting_schedule.time_of_day AND date = ? AND status IN ('completed', 'in_progress'))) as next_toileting_time,
         (SELECT scheduled_time FROM toileting_events WHERE elder_id = e.id AND date = ? AND status = 'in_progress' LIMIT 1) as in_progress_time,
         (SELECT MAX(scheduled_time) FROM toileting_events WHERE elder_id = e.id AND date = ? AND status = 'completed') as last_completed_time,
@@ -131,6 +131,38 @@ router.post('/update-toileting-status', async (req, res) => {
     }
 
     res.json({ success: true, message: `Toileting marked as ${status}` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update poo and pee counts
+router.post('/update-poo-pee-count', async (req, res) => {
+  try {
+    const { elder_id, type, amount } = req.body; // type: 'poo' or 'pee', amount: 1 or -1
+    const today = getTodayDate();
+
+    const column = type === 'poo' ? 'poo_count' : 'pee_count';
+    
+    // First, get the current count
+    const existing = await runSingleQuery(
+      `SELECT ${column} as current_count FROM daily_roster WHERE elder_id = ? AND date = ?`,
+      [elder_id, today]
+    );
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Elder not in today roster' });
+    }
+
+    let newCount = existing.current_count + amount;
+    if (newCount < 0) newCount = 0;
+
+    await runWrite(
+      `UPDATE daily_roster SET ${column} = ? WHERE elder_id = ? AND date = ?`,
+      [newCount, elder_id, today]
+    );
+
+    res.json({ success: true, message: `${type} count updated`, newCount });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -229,12 +261,58 @@ router.get('/elders', async (req, res) => {
 // Add new elder
 router.post('/elders', async (req, res) => {
   try {
-    const { name, identification_number } = req.body;
+    const { name, identification_number, track_poo_pee } = req.body;
     const result = await runWrite(
-      'INSERT INTO elders (name, identification_number) VALUES (?, ?)',
-      [name, identification_number]
+      'INSERT INTO elders (name, identification_number, track_poo_pee) VALUES (?, ?, ?)',
+      [name, identification_number, track_poo_pee ? 1 : 0]
     );
     res.json({ success: true, id: result.id, message: 'Elder added' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update an elder
+router.put('/elders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, identification_number, track_poo_pee } = req.body;
+
+    const existing = await runSingleQuery('SELECT * FROM elders WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Elder not found' });
+    }
+
+    await runWrite(
+      'UPDATE elders SET name = ?, identification_number = ?, track_poo_pee = ? WHERE id = ?',
+      [
+        name || existing.name, 
+        identification_number || existing.identification_number, 
+        track_poo_pee !== undefined ? (track_poo_pee ? 1 : 0) : existing.track_poo_pee, 
+        id
+      ]
+    );
+    res.json({ success: true, message: 'Elder updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete an elder
+router.delete('/elders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await runSingleQuery('SELECT * FROM elders WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Elder not found' });
+    }
+
+    await runWrite('DELETE FROM toileting_schedule WHERE elder_id = ?', [id]);
+    await runWrite('DELETE FROM daily_roster WHERE elder_id = ?', [id]);
+    await runWrite('DELETE FROM toileting_events WHERE elder_id = ?', [id]);
+    await runWrite('DELETE FROM elders WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Elder deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
